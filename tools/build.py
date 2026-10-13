@@ -4,16 +4,17 @@
 Запуск из корня репозитория:  python3 tools/build.py
 Результат записывается в папку site/. Тексты и метаданные находятся в этом файле.
 
-Настройки берутся из переменных окружения (в GitHub Actions их задаёт workflow):
+Настройка берётся из переменной окружения (в GitHub Actions её задаёт workflow):
   SITE_URL           публичный адрес сайта, например https://user.github.io/repo
                      или https://ваш-домен.ru (если есть путь — ссылки подстроятся сами)
-  Контактная форма работает через mailto: подготовленное письмо открывается
-  в почтовом приложении посетителя. На сервер сайта ничего не отправляется.
+
+Контактная форма работает через mailto: подготовленное письмо открывается
+в почтовом приложении посетителя. На сервер сайта ничего не отправляется.
 """
 import os
 import re
 from html import escape
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "site")
@@ -50,6 +51,31 @@ PHOTOS = {
     "side": ("ln1ya_assembly_03_side", "Сборка полётного контроллера LN1YA с платой управления питанием и инерциальной системой, вид сбоку"),
 }
 
+# ---- Значки (простые линейные, 24×24) -----------------------------------
+ICONS = {
+    "chip": '<rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M9 3v4M15 3v4M9 17v4M15 17v4M3 9h4M3 15h4M17 9h4M17 15h4"/>',
+    "compass": '<circle cx="12" cy="12" r="9"/><path d="m16 8-2 6-6 2 2-6z"/>',
+    "activity": '<path d="M3 12h4l3-7 4 14 3-7h4"/>',
+    "plane": '<path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>',
+    "layers": '<path d="m12 2 10 5-10 5L2 7zM2 17l10 5 10-5M2 12l10 5 10-5"/>',
+    "grid": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+    "route": '<circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/>',
+    "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    "eye": '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+    "package": '<path d="M16.5 9.4 7.5 4.2M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7zM3.3 7l8.7 5 8.7-5M12 22V12"/>',
+    "link": '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>',
+    "bulb": '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.3h6c0-1 .4-1.8 1-2.3A7 7 0 0 0 12 2z"/>',
+    "mail": '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+}
+
+
+def icon(name):
+    return '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">%s</svg>' % ICONS[name]
+
+
+def badge(name):
+    return '<span class="icon-badge">%s</span>' % icon(name)
+
 
 def picture(key, sizes, eager=False, cls=""):
     base, alt = PHOTOS[key]
@@ -64,6 +90,22 @@ def picture(key, sizes, eager=False, cls=""):
     ) % (srcset_w, sizes, IMG, base, srcset_j, sizes, escape(alt), load, (' class="%s"' % cls) if cls else "")
 
 
+def lb_button(key, caption, sizes, eager=False):
+    """Фото, открывающееся в модальной галерее."""
+    base, alt = PHOTOS[key]
+    cap = escape(caption, quote=True)
+    return (
+        '<button type="button" data-lightbox data-full="%s%s-1280.jpg" data-alt="%s" data-caption="%s" '
+        'aria-label="Открыть фото в полном размере: %s">%s</button>'
+        % (IMG, base, escape(alt, quote=True), cap, cap, picture(key, sizes, eager))
+    )
+
+
+def contact_link(topic):
+    return "/contacts/?topic=" + quote(topic)
+
+
+# ---- Общие блоки страницы -----------------------------------------------
 def head(title, desc, path, og_image="og-image.jpg", noindex=False):
     url = SITE_URL + path
     robots = '<meta name="robots" content="noindex, follow">\n' if noindex else ""
@@ -115,6 +157,7 @@ def header(active):
 {items}
 </ul>
 </nav>
+<a class="btn btn--sm header-cta" href="/contacts/#request">Отправить запрос</a>
 </div>
 </header>
 """.format(items="\n".join(items), w=round(1216 / 717 * 56))
@@ -139,13 +182,14 @@ def footer():
 <h2>Контакты</h2>
 <p>{legal}</p>
 <p><a href="mailto:{email}">{email}</a></p>
+<p>{address}</p>
 <p>ИНН {inn} · ОГРН {ogrn}</p>
 </div>
 </div>
 <p class="footer-bottom">© {year} {short}</p>
 </div>
 </footer>
-""".format(nav=nav, legal=LEGAL_NAME, short=SHORT_NAME, email=EMAIL, inn=INN, ogrn=OGRN, year=YEAR, w=round(1216 / 717 * 84))
+""".format(nav=nav, legal=LEGAL_NAME, short=SHORT_NAME, email=EMAIL, inn=INN, ogrn=OGRN, address=LEGAL_ADDRESS, year=YEAR, w=round(1216 / 717 * 84))
 
 
 def scripts():
@@ -156,22 +200,85 @@ def scripts():
 """
 
 
-def page_hero(crumbs, h1, lead, tag=None, extra=""):
+def breadcrumbs(crumbs):
     bc = []
     for i, (href, label) in enumerate(crumbs):
         if i == len(crumbs) - 1:
             bc.append('<li><span aria-current="page">%s</span></li>' % label)
         else:
             bc.append('<li><a href="%s">%s</a></li>' % (href, label))
-    tag_html = '<span class="tag">%s</span>\n' % tag if tag else ""
-    return """<section class="page-hero on-dark">
-<div class="container">
-<nav aria-label="Навигационная цепочка"><ol class="breadcrumbs">{bc}</ol></nav>
-{tag}<h1>{h1}</h1>
-<p class="lead">{lead}</p>
-{extra}</div>
+    return '<nav aria-label="Навигационная цепочка"><ol class="breadcrumbs">%s</ol></nav>' % "".join(bc)
+
+
+def page_hero(crumbs, h1, lead, side="", buttons=""):
+    """Первый экран внутренней страницы. side — правая колонка (фото, логотип, информационная карточка)."""
+    btn = '<div class="btn-row">%s</div>\n' % buttons if buttons else ""
+    text = '<h1>%s</h1>\n<p class="lead">%s</p>\n%s' % (h1, lead, btn)
+    if side:
+        inner = '<div class="hero-split">\n<div class="hero-text">\n%s</div>\n<div class="hero-side">\n%s\n</div>\n</div>\n' % (text, side)
+    else:
+        inner = text
+    return '<section class="page-hero on-dark">\n<div class="container">\n%s\n%s</div>\n</section>\n' % (breadcrumbs(crumbs), inner)
+
+
+def section_head(h2, lead=None, hid=None):
+    i = ' id="%s"' % hid if hid else ""
+    p = "<p>%s</p>" % lead if lead else ""
+    return '<div class="section-head"><h2%s>%s</h2>%s</div>' % (i, h2, p)
+
+
+def check_list(items):
+    return '<ul class="check-list">%s</ul>' % "".join("<li>%s</li>" % t for t in items)
+
+
+def chips(items):
+    return '<ul class="chips">%s</ul>' % "".join("<li>%s</li>" % t for t in items)
+
+
+def steps(items, light=False):
+    li = "".join("<li><h3>%s</h3><p>%s</p></li>" % (t, d) for t, d in items)
+    return '<ol class="steps%s">%s</ol>' % (" steps--light" if light else "", li)
+
+
+def tiles(items):
+    out = "".join(
+        '<article class="tile">%s<h3>%s</h3><p>%s</p></article>' % (badge(ic), t, d) for ic, t, d in items
+    )
+    return '<div class="tiles">%s</div>' % out
+
+
+def principles():
+    items = [
+        ("Собственные разработки", "Электронные устройства и системы ЛоджикНав – собственные разработки компании."),
+        ("Российская компонентная база", "При создании изделий ориентируемся на российскую компонентную базу."),
+        ("Инженерный подход", "Последовательно рассматриваем задачу заказчика, прорабатываем требования, создаём опытные решения и проверяем их."),
+        ("Индивидуальная работа с запросами", "Подробные сведения об изделиях и разработках обсуждаются со специалистами применительно к вашему проекту."),
+    ]
+    return '<div class="principles">%s</div>' % "".join("<div><h3>%s</h3><p>%s</p></div>" % it for it in items)
+
+
+def cta_band(title="Обсудим вашу задачу?", text="Опишите задачу в форме обратной связи: специалисты ЛоджикНав изучат запрос и свяжутся с вами.", topic=None, label="Отправить запрос"):
+    href = contact_link(topic) + "#request" if topic else "/contacts/#request"
+    return """<section class="section on-dark cta-band" aria-labelledby="cta-title">
+<div class="container cta-block">
+<div class="cta-text">
+<h2 id="cta-title">%s</h2>
+<p>%s</p>
+</div>
+<a class="btn" href="%s">%s</a>
+</div>
 </section>
-""".format(bc="".join(bc), tag=tag_html, h1=h1, lead=lead, extra=extra)
+""" % (title, text, href, label)
+
+
+def info_card(title, items):
+    return '<aside class="info-card" aria-label="%s"><h2>%s</h2>%s</aside>' % (title, title, check_list(items))
+
+
+def neutral_media(code, sub=""):
+    """Нейтральная типографская плашка вместо изображения оборудования."""
+    s = '<span class="neutral-sub">%s</span>' % sub if sub else ""
+    return '<div class="card-media card-media--neutral" aria-hidden="true"><span class="neutral-code">%s</span>%s</div>' % (code, s)
 
 
 def prefix(html):
@@ -190,21 +297,16 @@ def write(path, content):
         f.write(prefix(content))
 
 
-def contact_link(topic):
-    from urllib.parse import quote
-    return "/contacts/?topic=" + quote(topic)
-
-
-pages = {}
-
-# ============================ Главная ===============================
+# =========================================================================
+# Главная
+# =========================================================================
 home = head(
     "ЛоджикНав – разработка электроники и навигационных решений",
     "ООО «Логическая навигация». Электронные устройства управления, полётные контроллеры и системы мониторинга.",
     "/",
 )
 home += header(("home", True))
-home += """<main id="main">
+home += ("""<main id="main">
 
 <section class="hero on-dark">
 <div class="container">
@@ -214,7 +316,7 @@ home += """<main id="main">
 <p class="tagline">Собственные разработки. Инженерный подход. Российская компонентная база.</p>
 <div class="btn-row">
 <a class="btn" href="/products/">Продукция</a>
-<a class="btn btn--ghost" href="/contacts/">Связаться с нами</a>
+<a class="btn btn--ghost" href="/contacts/#request">Связаться с нами</a>
 </div>
 </div>
 <div class="hero-figure">
@@ -228,19 +330,28 @@ home += """<main id="main">
 
 <section class="section section--tint" aria-labelledby="directions">
 <div class="container">
-<div class="section-head"><h2 id="directions">Направления работы</h2></div>
+""" + section_head("Направления работы", "Три связанных направления: от управляющей электроники до систем наблюдения за протяжёнными объектами.", "directions") + """
 <div class="cards cards--3">
 <article class="card card--direction">
+""" + badge("chip") + """
 <h3>Полётные контроллеры</h3>
 <p>Электронные устройства управления для беспилотных платформ. Разработка, адаптация и интеграция решений.</p>
+""" + check_list(["Электронные модули управления", "Адаптация под задачи платформы", "Интеграция в состав систем"]) + """
+<a class="card-link" href="/products/">Раздел «Продукция»</a>
 </article>
 <article class="card card--direction">
+""" + badge("compass") + """
 <h3>Навигационная электроника</h3>
 <p>Инженерные решения для работы с навигационными данными и взаимодействия электронных модулей.</p>
+""" + check_list(["Работа с навигационными данными", "Взаимодействие электронных модулей", "Развитие навигационных решений"]) + """
+<a class="card-link" href="/products/ln14ya/">Контроллер LN14YA</a>
 </article>
 <article class="card card--direction">
+""" + badge("activity") + """
 <h3>Системы мониторинга</h3>
 <p>Аппаратно-программные комплексы для регистрации и анализа событий на распределённых объектах.</p>
+""" + check_list(["Регистрация и анализ событий", "Протяжённые и распределённые объекты", "Аппаратная и программная части"]) + """
+<a class="card-link" href="/projects/">Раздел «Разработки»</a>
 </article>
 </div>
 </div>
@@ -248,68 +359,123 @@ home += """<main id="main">
 
 <section class="section" aria-labelledby="products">
 <div class="container">
-<div class="section-head"><h2 id="products">Продукция и разработки</h2></div>
-<div class="cards cards--3">
+""" + section_head("Продукция и разработки", "Изделия и технологические проекты ЛоджикНав. Подробные сведения предоставляем по запросу.", "products") + """
+
+<article class="feature">
+<div class="feature-media">
+<div class="feature-photos">
+{feat_a}
+{feat_b}
+</div>
+<p class="feature-hint">Нажмите на фотографию, чтобы увеличить</p>
+</div>
+<div class="feature-body">
+<h3>LN1YA</h3>
+<p class="feature-sub">LN1YA – полётный контроллер на российской элементной базе.</p>
+<p>Электронный модуль управления для интеграции в беспилотные платформы и применения в составе специализированных комплексов. Для разных задач предусмотрены варианты комплектации.</p>
+""" + chips(["Полётный контроллер", "С платой управления питанием", "С инерциальной системой"]) + """
+<div class="btn-row">
+<a class="btn" href="/products/ln1ya/">Подробнее</a>
+<a class="btn btn--outline" href="{ln1ya_cta}">Запросить информацию</a>
+</div>
+</div>
+</article>
+
+<div class="cards cards--2 cards--gap-top">
 <article class="card card--product">
-<div class="card-media">{card_pic}</div>
+""" + neutral_media("LN14YA") + """
 <div class="card-inner">
 <div class="card-body">
-<h3>LN1YA</h3>
-<p>LN1YA – полётный контроллер на российской элементной базе.</p>
-</div>
-<a class="btn btn--outline" href="/products/ln1ya/">Подробнее</a>
-</div>
-</article>
-<article class="card">
-<div class="card-meta"><span class="tag tag--light">В разработке</span></div>
-<div class="card-body">
 <h3>LN14YA</h3>
-<p>LN14YA – полётный контроллер нового поколения.</p>
+<p>LN14YA – полётный контроллер нового поколения. Развитие вычислительных и навигационных функций и возможностей интеграции в состав различных систем.</p>
 </div>
 <a class="btn btn--outline" href="/products/ln14ya/">О проекте</a>
+</div>
 </article>
-<article class="card">
-<div class="card-meta"></div>
+<article class="card card--product">
+""" + neutral_media("«Тетива-М»") + """
+<div class="card-inner">
 <div class="card-body">
 <h3>«Тетива-М»</h3>
-<p>«Тетива-М» – распределённая акустическая система на основе оптоволокна.</p>
+<p>«Тетива-М» – распределённая акустическая система на основе оптоволокна. Непрерывный мониторинг протяжённых объектов и инфраструктуры.</p>
 </div>
 <a class="btn btn--outline" href="/projects/tetiva-m/">О разработке</a>
+</div>
 </article>
 </div>
+</div>
+</section>
+
+<section class="section section--tint" aria-labelledby="areas">
+<div class="container">
+""" + section_head("Где применяются наши решения", "Конкретная конфигурация всегда определяется задачей и условиями применения.", "areas") + tiles([
+    ("plane", "Беспилотные платформы", "Электронные устройства управления для интеграции в состав беспилотных платформ."),
+    ("layers", "Специализированные комплексы", "Применение полётных контроллеров в составе комплексов по согласованным требованиям."),
+    ("grid", "Навигационные данные", "Решения для работы с навигационными данными и взаимодействия электронных модулей."),
+    ("route", "Протяжённая инфраструктура", "Непрерывное наблюдение за событиями вдоль протяжённых участков и объектов."),
+    ("shield", "Охрана периметров", "Мониторинг периметров и выявление акустических воздействий."),
+    ("eye", "Состояние объектов", "Наблюдение за состоянием объектов, регистрация и анализ событий."),
+]) + """
 </div>
 </section>
 
 <section class="section on-dark" aria-labelledby="process">
 <div class="container">
-<h2 id="process">От идеи до инженерного решения</h2>
-<p>Работа над изделием включает анализ требований, разработку концепции, создание опытных образцов, испытания и доработку конструкции. Решения формируются с учётом задач и условий применения.</p>
-<ol class="process">
-<li>Анализ требований</li>
-<li>Разработка концепции</li>
-<li>Создание опытных образцов</li>
-<li>Испытания</li>
-<li>Доработка конструкции</li>
-</ol>
+""" + section_head("От идеи до инженерного решения", "Работа над изделием включает анализ требований, разработку концепции, создание опытных образцов, испытания и доработку конструкции. Решения формируются с учётом задач и условий применения.", "process") + steps([
+    ("Анализ требований", "Разбираем задачу, условия применения и ограничения, фиксируем требования к изделию."),
+    ("Разработка концепции", "Определяем инженерный подход и состав решения под зафиксированные требования."),
+    ("Опытные образцы", "Создаём опытные образцы, на которых проверяются принятые решения."),
+    ("Испытания", "Проверяем изделие на соответствие требованиям задачи."),
+    ("Доработка конструкции", "Учитываем результаты проверок и дорабатываем конструкцию."),
+]) + """
+</div>
+</section>
+
+<section class="section" aria-labelledby="principles">
+<div class="container">
+""" + section_head("Принципы работы", None, "principles") + principles() + """
 </div>
 </section>
 
 <section class="section section--tint" aria-labelledby="cooperation">
 <div class="container">
-<div class="cta-block">
-<div class="cta-text">
-<h2 id="cooperation">Сотрудничество</h2>
-<p>Рассматриваем запросы на поставку электронных изделий, их интеграцию и проработку новых технических решений. Для обсуждения проекта направьте описание задачи через форму обратной связи.</p>
+""" + section_head("Сотрудничество", "Рассматриваем запросы на поставку электронных изделий, их интеграцию и проработку новых технических решений. Для обсуждения проекта направьте описание задачи через форму обратной связи.", "cooperation") + """
+<div class="cards cards--3">
+<article class="card">
+""" + badge("package") + """
+<h3>Поставка электронных изделий</h3>
+<p>Рассматриваем запросы на поставку изделий. Состав и условия уточняются по запросу.</p>
+</article>
+<article class="card">
+""" + badge("link") + """
+<h3>Интеграция</h3>
+<p>Обсуждаем встраивание электронных модулей в платформы и комплексы заказчика.</p>
+</article>
+<article class="card">
+""" + badge("bulb") + """
+<h3>Новые технические решения</h3>
+<p>Прорабатываем решения под задачу, которой нет в готовом каталоге.</p>
+</article>
 </div>
-<a class="btn" href="/contacts/">Отправить запрос</a>
+
+<div class="request-flow">
+<h3>Как направить запрос</h3>
+""" + steps([
+    ("Опишите задачу", "Заполните форму на странице «Контакты»: кратко опишите, что нужно сделать."),
+    ("Проверьте письмо", "Откроется почтовое приложение с готовым письмом. Проверьте его и отправьте сами."),
+    ("Получите ответ", "Специалисты свяжутся с вами по указанным контактам."),
+], light=True) + """
+<a class="btn" href="/contacts/#request">Отправить запрос</a>
 </div>
 </div>
 </section>
 
 </main>
-""".format(
+""").format(
     hero_pic=picture("main", "(max-width: 900px) 92vw, 560px", eager=True),
-    card_pic=picture("main", "(max-width: 960px) 92vw, 380px"),
+    feat_a=lb_button("front", "LN1YA, вид спереди", "(max-width: 900px) 46vw, 270px"),
+    feat_b=lb_button("side", "LN1YA, вид сбоку", "(max-width: 900px) 46vw, 270px"),
+    ln1ya_cta=contact_link("Запрос информации о LN1YA") + "#request",
 )
 org_ld = """<script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Organization","name":"ООО «Логическая навигация»","legalName":"Общество с ограниченной ответственностью «Логическая навигация»","alternateName":"ООО «ЛоджикНав»","identifier":"1267700240477","taxID":"7736378193","url":"%s/","logo":"%s/assets/img/logo_primary.png","email":"%s","address":{"@type":"PostalAddress","postalCode":"119296","addressLocality":"Москва","streetAddress":"Ломоносовский проспект, д. 4, к. 2, помещ. 1А/П","addressCountry":"RU"}}
@@ -318,21 +484,23 @@ org_ld = """<script type="application/ld+json">
 home += org_ld + footer() + scripts()
 write("/", home)
 
-# ============================ Продукция =============================
+# =========================================================================
+# Продукция
+# =========================================================================
 p = head(
     "Полётные контроллеры – ООО «ЛоджикНав»",
-    "Изделие LN1YA и перспективная разработка LN14YA. Информация о продукции и запрос для сотрудничества.",
+    "Полётные контроллеры LN1YA и LN14YA нового поколения. Информация о продукции и запрос для сотрудничества.",
     "/products/",
 )
 p += header(("products", True))
-p += "<main id=\"main\">\n" + page_hero(
+p += '<main id="main">\n' + page_hero(
     [("/", "Главная"), ("/products/", "Продукция")],
     "Полётные контроллеры",
-    "ООО «ЛоджикНав» разрабатывает электронные устройства управления для беспилотных платформ. В разделе представлены изделие LN1YA и перспективная разработка LN14YA.",
+    "ООО «ЛоджикНав» разрабатывает электронные устройства управления для беспилотных платформ. В разделе представлены изделие LN1YA и полётный контроллер нового поколения LN14YA.",
 )
-p += """<section class="section" aria-labelledby="items">
+p += ("""<section class="section" aria-labelledby="items">
 <div class="container">
-<h2 id="items" class="visually-hidden">Изделия</h2>
+""" + section_head("Изделия", None, "items") + """
 <div class="cards cards--2">
 <article class="card card--product">
 <div class="card-media">{pic}</div>
@@ -340,57 +508,102 @@ p += """<section class="section" aria-labelledby="items">
 <div class="card-body">
 <h3>LN1YA</h3>
 <p>Полётный контроллер на российской элементной базе. Возможны различные варианты комплектации.</p>
+<p>Электронный модуль управления для интеграции в беспилотные платформы и применения в составе специализированных комплексов.</p>
 </div>
 <a class="btn btn--outline" href="/products/ln1ya/">Подробнее</a>
 </div>
 </article>
-<article class="card">
-<div class="card-meta"><span class="tag tag--light">В разработке</span></div>
+<article class="card card--product">
+""" + neutral_media("LN14YA") + """
+<div class="card-inner">
 <div class="card-body">
 <h3>LN14YA</h3>
-<p>Перспективный полётный контроллер с расширенными возможностями интеграции.</p>
+<p>Полётный контроллер нового поколения с расширенными возможностями интеграции.</p>
+<p>Развитие вычислительных и навигационных функций для беспилотных платформ.</p>
 </div>
 <a class="btn btn--outline" href="/products/ln14ya/">Подробнее</a>
+</div>
 </article>
 </div>
 </div>
 </section>
+
+<section class="section section--tint" aria-labelledby="common">
+<div class="container">
+""" + section_head("Что объединяет изделия", "Общий подход ЛоджикНав к полётным контроллерам.", "common") + tiles([
+    ("layers", "Интеграция в системы", "Контроллеры предназначены для встраивания в беспилотные платформы и специализированные комплексы."),
+    ("chip", "Российская компонентная база", "Ориентируемся на российскую элементную базу при разработке изделий."),
+    ("package", "Варианты комплектации", "Состав поставки подбирается под задачу. Актуальный состав и доступность уточняются по запросу."),
+]) + """
+</div>
+</section>
+
+<section class="section" aria-labelledby="info">
+<div class="container">
+""" + section_head("Подробные сведения – по запросу", None, "info") + """
+<div class="spec-row">
+<h3>Как мы работаем с запросами</h3>
+<div>
+<p>Характеристики, требования к подключению, программная совместимость и документацию мы не публикуем в открытом доступе: они обсуждаются со специалистами применительно к конкретному проекту. Опишите задачу, и мы подскажем, какое решение подойдёт.</p>
+<div class="btn-row">
+<a class="btn" href="/contacts/#request">Отправить запрос</a>
+</div>
+</div>
+</div>
+</div>
+</section>
 </main>
-""".format(pic=picture("main", "(max-width: 760px) 92vw, 580px", eager=True))
+""").format(pic=picture("main", "(max-width: 760px) 92vw, 580px", eager=True))
 p += footer() + scripts()
 write("/products/", p)
 
-# ============================ LN1YA =================================
+# =========================================================================
+# LN1YA
+# =========================================================================
 cap1 = "Фото 1. Сборка LN1YA с платой управления питанием и инерциальной системой. Основной кадр."
 cap2 = "Фото 2. Спереди"
 cap3 = "Фото 3. Сбоку"
-
-
-def lb_button(key, caption, sizes, eager=False):
-    base, alt = PHOTOS[key]
-    return (
-        '<button type="button" data-lightbox data-full="%s%s-1280.jpg" data-alt="%s" data-caption="%s" aria-label="Открыть фото в полном размере: %s">%s</button>'
-        % (IMG, base, escape(alt, quote=True), escape(caption, quote=True), escape(caption, quote=True), picture(key, sizes, eager))
-    )
-
 
 l1 = head(
     "LN1YA – полётный контроллер – ЛоджикНав",
     "Полётный контроллер LN1YA на российской элементной базе. Варианты комплектации и запрос информации.",
     "/products/ln1ya/",
-    og_image="og-image.jpg",
 )
 l1 += header(("products", False))
-l1 += "<main id=\"main\">\n" + page_hero(
+l1 += '<main id="main">\n' + page_hero(
     [("/", "Главная"), ("/products/", "Продукция"), ("/products/ln1ya/", "LN1YA")],
     "LN1YA – полётный контроллер",
     "LN1YA – электронный модуль управления на российской элементной базе. Контроллер предназначен для интеграции в беспилотные платформы и применения в составе специализированных комплексов.",
+    side='<div class="hero-figure"><figure class="plate">%s<figcaption>Сборка LN1YA с платой управления питанием и инерциальной системой</figcaption></figure></div>' % picture("main", "(max-width: 900px) 92vw, 520px", eager=True),
+    buttons='<a class="btn" href="%s">Запросить информацию о LN1YA</a><a class="btn btn--ghost" href="/products/">Вся продукция</a>' % (contact_link("Запрос информации о LN1YA") + "#request"),
 )
-l1 += """<section class="section">
+l1 += ("""<section class="section" aria-labelledby="about-ln1ya">
 <div class="container">
+""" + section_head("О контроллере", "LN1YA входит в линейку полётных контроллеров ЛоджикНав и поставляется в нескольких вариантах.", "about-ln1ya") + """
+<div class="cards cards--3">
+<article class="card">
+""" + badge("chip") + """
+<h3>Полётный контроллер</h3>
+<p>Основной электронный модуль управления для беспилотных платформ.</p>
+</article>
+<article class="card">
+""" + badge("layers") + """
+<h3>Плата управления питанием</h3>
+<p>Дополнительный модуль, который входит в сборку на фотографиях и в соответствующую комплектацию.</p>
+</article>
+<article class="card">
+""" + badge("compass") + """
+<h3>Инерциальная система</h3>
+<p>Дополнительная система для исполнений, в которых она предусмотрена.</p>
+</article>
+</div>
+</div>
+</section>
 
+<section class="section section--tint" aria-labelledby="variants">
+<div class="container">
 <div class="spec-row">
-<h2>Варианты комплектации</h2>
+<h2 id="variants">Варианты комплектации</h2>
 <div>
 <ul class="variants">
 <li>Полётный контроллер</li>
@@ -400,16 +613,17 @@ l1 += """<section class="section">
 <p>В зависимости от задачи предусмотрены варианты поставки полётного контроллера, контроллера с платой управления питанием, а также исполнения с дополнительной инерциальной системой. Актуальный состав и доступность комплектаций уточняются по запросу.</p>
 </div>
 </div>
+</div>
+</section>
 
-<div class="spec-row">
-<h2>Фотографии изделия</h2>
-<div>
-<p>На фотографиях представлена сборка полётного контроллера, платы управления питанием и инерциальной системы. Три снимка показывают одну сборку с разных ракурсов.</p>
-<figure class="photo photo-main">
+<section class="section" aria-labelledby="photos">
+<div class="container">
+""" + section_head("Фотографии изделия", "На фотографиях представлена сборка полётного контроллера, платы управления питанием и инерциальной системы. Три снимка показывают одну сборку с разных ракурсов. Нажмите на снимок, чтобы открыть его в полном размере.", "photos") + """
+<div class="gallery-grid gallery-grid--3">
+<figure class="photo">
 {b1}
 <figcaption>{c1}</figcaption>
 </figure>
-<div class="gallery-grid">
 <figure class="photo">
 {b2}
 <figcaption>{c2}</figcaption>
@@ -420,175 +634,276 @@ l1 += """<section class="section">
 </figure>
 </div>
 </div>
-</div>
+</section>
 
+<section class="section section--tint" aria-labelledby="integration">
+<div class="container">
 <div class="spec-row">
-<h2>Интеграция и техническая информация</h2>
+<h2 id="integration">Интеграция и техническая информация</h2>
 <div>
 <p>Возможности применения контроллера, требования к подключению, программная совместимость и комплект документации обсуждаются со специалистами компании применительно к конкретному проекту.</p>
+<p>В запросе можно уточнить:</p>
+""" + check_list(["возможности применения в вашей платформе", "требования к подключению", "программную совместимость", "комплект документации", "актуальный состав и доступность комплектаций"]) + """
+<div class="btn-row">
 <a class="btn" href="{cta}">Запросить информацию о LN1YA</a>
 </div>
 </div>
-
+</div>
 </div>
 </section>
 </main>
-""".format(
-    b1=lb_button("main", cap1, "(max-width: 900px) 92vw, 830px", True),
-    b2=lb_button("front", cap2, "(max-width: 640px) 92vw, 405px"),
-    b3=lb_button("side", cap3, "(max-width: 640px) 92vw, 405px"),
+""").format(
+    b1=lb_button("main", cap1, "(max-width: 760px) 92vw, 380px"),
+    b2=lb_button("front", cap2, "(max-width: 760px) 92vw, 380px"),
+    b3=lb_button("side", cap3, "(max-width: 760px) 92vw, 380px"),
     c1=cap1, c2=cap2, c3=cap3,
-    cta=contact_link("Запрос информации о LN1YA"),
+    cta=contact_link("Запрос информации о LN1YA") + "#request",
 )
 l1 += footer() + scripts()
 write("/products/ln1ya/", l1)
 
-# ============================ LN14YA ================================
+# =========================================================================
+# LN14YA
+# =========================================================================
 l14 = head(
-    "LN14YA – полётный контроллер в разработке – ЛоджикНав",
-    "Перспективная разработка полётного контроллера LN14YA. Назначение и статус проекта.",
+    "LN14YA – полётный контроллер нового поколения – ЛоджикНав",
+    "Полётный контроллер LN14YA нового поколения: назначение, направления развития и запрос информации.",
     "/products/ln14ya/",
 )
 l14 += header(("products", False))
-l14 += "<main id=\"main\">\n" + page_hero(
+l14 += '<main id="main">\n' + page_hero(
     [("/", "Главная"), ("/products/", "Продукция"), ("/products/ln14ya/", "LN14YA")],
-    "LN14YA – перспективный полётный контроллер",
-    "LN14YA – разрабатываемое электронное устройство управления для беспилотных платформ. Проект предусматривает развитие вычислительных и навигационных функций, а также возможностей интеграции в состав различных систем.",
-    tag="В разработке",
+    "LN14YA – полётный контроллер нового поколения",
+    "LN14YA – электронное устройство управления для беспилотных платформ. Проект предусматривает развитие вычислительных и навигационных функций, а также возможностей интеграции в состав различных систем.",
+    side=info_card("Коротко", ["Полётный контроллер нового поколения", "Вычислительные и навигационные функции", "Интеграция в состав различных систем"]),
+    buttons='<a class="btn" href="%s">Запросить информацию о LN14YA</a><a class="btn btn--ghost" href="/products/">Вся продукция</a>' % (contact_link("Запрос информации о LN14YA") + "#request"),
 )
-l14 += """<section class="section">
+l14 += ("""<section class="section" aria-labelledby="directions">
+<div class="container">
+""" + section_head("Направления развития", "Основные направления, по которым строится устройство.", "directions") + """
+<div class="cards cards--3">
+<article class="card">
+""" + badge("chip") + """
+<h3>Вычислительные функции</h3>
+<p>Развитие вычислительных возможностей управляющего устройства.</p>
+</article>
+<article class="card">
+""" + badge("compass") + """
+<h3>Навигационные функции</h3>
+<p>Развитие функций работы с навигационными данными.</p>
+</article>
+<article class="card">
+""" + badge("link") + """
+<h3>Интеграция в системы</h3>
+<p>Расширенные возможности встраивания в состав различных систем и платформ.</p>
+</article>
+</div>
+</div>
+</section>
+
+<section class="section section--tint" aria-labelledby="usage">
 <div class="container">
 <div class="spec-row">
-<h2>Статус разработки</h2>
+<h2 id="usage">Состав функций и применение</h2>
 <div>
-<p>Изделие находится на стадии разработки. Окончательный состав функций и условия применения будут определены по результатам дальнейшей инженерной проработки.</p>
+<p>LN14YA входит в линейку полётных контроллеров ЛоджикНав и предназначен для беспилотных платформ. Состав функций и условия применения обсуждаются со специалистами применительно к задачам вашего проекта.</p>
 </div>
 </div>
 <div class="spec-row">
 <h2>Сотрудничество</h2>
 <div>
 <p>Для получения актуальной информации о проекте и возможности применения LN14YA направьте запрос специалистам компании.</p>
+<div class="btn-row">
 <a class="btn" href="{cta}">Запросить информацию о LN14YA</a>
+</div>
 </div>
 </div>
 </div>
 </section>
 </main>
-""".format(cta=contact_link("Запрос информации о LN14YA"))
+""").format(cta=contact_link("Запрос информации о LN14YA") + "#request")
 l14 += footer() + scripts()
 write("/products/ln14ya/", l14)
 
-# ============================ Разработки ============================
+# =========================================================================
+# Разработки
+# =========================================================================
 pr = head(
     "Технологические разработки – ООО «ЛоджикНав»",
     "Инженерные проекты ООО «ЛоджикНав» в области электроники, навигации и систем мониторинга. Распределённая акустическая система «Тетива-М».",
     "/projects/",
 )
 pr += header(("projects", True))
-pr += "<main id=\"main\">\n" + page_hero(
+pr += '<main id="main">\n' + page_hero(
     [("/", "Главная"), ("/projects/", "Разработки")],
     "Технологические разработки",
-    "ЛоджикНав развивает инженерные проекты в области электроники, навигации и систем мониторинга. В разделе представлены направления, находящиеся в разработке, и сведения об их назначении.",
+    "ЛоджикНав развивает инженерные проекты в области электроники, навигации и систем мониторинга. В разделе представлены наши разработки и сведения об их назначении.",
 )
-pr += """<section class="section">
+pr += """<section class="section" aria-labelledby="projects-list">
 <div class="container">
-<h2 class="visually-hidden">Разработки</h2>
-<div class="cards cards--3">
-<article class="card">
-<div class="card-body">
+""" + section_head("Разработки", None, "projects-list") + """
+<article class="feature feature--neutral">
+""" + neutral_media("«Тетива-М»", "Распределённая акустическая система") + """
+<div class="feature-body">
 <h3>«Тетива-М»</h3>
-<p>«Тетива-М» – распределённая акустическая система на основе оптоволокна.</p>
+<p class="feature-sub">«Тетива-М» – распределённая акустическая система на основе оптоволокна.</p>
+<p>Система распределённого акустического мониторинга для наблюдения за событиями вдоль протяжённых объектов и инфраструктуры.</p>
+""" + chips(["Протяжённая инфраструктура", "Охрана периметров", "Состояние объектов"]) + """
+<div class="btn-row">
+<a class="btn" href="/projects/tetiva-m/">Подробнее</a>
 </div>
-<a class="btn btn--outline" href="/projects/tetiva-m/">Подробнее</a>
+</div>
 </article>
 </div>
+</section>
+
+<section class="section section--tint" aria-labelledby="approach">
+<div class="container">
+""" + section_head("Как мы подходим к разработкам", "Одна последовательность для изделий и для технологических проектов.", "approach") + steps([
+    ("Анализ требований", "Фиксируем задачу и условия применения."),
+    ("Концепция", "Определяем состав решения под задачу."),
+    ("Опытные образцы", "Проверяем принятые решения на практике."),
+    ("Испытания", "Оцениваем соответствие требованиям."),
+    ("Доработка", "Учитываем результаты и дорабатываем решение."),
+], light=True) + """
 </div>
 </section>
 </main>
 """
+pr += cta_band("Нужна разработка под вашу задачу?", "Опишите задачу: обсудим, какое решение можно проработать, и сформулируем следующие шаги.")
 pr += footer() + scripts()
 write("/projects/", pr)
 
-# ============================ Тетива-М ==============================
+# =========================================================================
+# Тетива-М
+# =========================================================================
 t = head(
     "Тетива-М – распределённая акустическая система – ЛоджикНав",
-    "Разрабатываемая оптоволоконная система распределённого акустического мониторинга.",
+    "Распределённая акустическая система «Тетива-М» на основе оптоволокна для мониторинга протяжённых объектов и инфраструктуры.",
     "/projects/tetiva-m/",
 )
 t += header(("projects", False))
-t += "<main id=\"main\">\n" + page_hero(
+t += '<main id="main">\n' + page_hero(
     [("/", "Главная"), ("/projects/", "Разработки"), ("/projects/tetiva-m/", "«Тетива-М»")],
     "«Тетива-М» – распределённая акустическая система",
-    "«Тетива-М» – разрабатываемая система распределённого акустического мониторинга на основе оптоволоконной технологии. Решение ориентировано на наблюдение за событиями вдоль протяжённых объектов и инфраструктуры.",
+    "«Тетива-М» – система распределённого акустического мониторинга на основе оптоволоконной технологии. Решение ориентировано на наблюдение за событиями вдоль протяжённых объектов и инфраструктуры.",
+    side=info_card("Коротко", ["Непрерывный мониторинг", "Протяжённые участки и инфраструктура", "Выявление акустических воздействий"]),
+    buttons='<a class="btn" href="%s">Запросить информацию о «Тетиве-М»</a><a class="btn btn--ghost" href="/projects/">Все разработки</a>' % (contact_link("Запрос информации о «Тетиве-М»") + "#request"),
 )
-t += """<section class="section">
+t += ("""<section class="section" aria-labelledby="purpose">
 <div class="container">
 <div class="spec-row">
-<h2>Назначение</h2>
+<h2 id="purpose">Назначение</h2>
 <div>
 <p>Система предназначена для организации непрерывного мониторинга и выявления акустических воздействий на протяжённых участках. Возможность применения рассматривается с учётом требований конкретного объекта.</p>
 </div>
 </div>
-<div class="spec-row">
-<h2>Области применения</h2>
-<div>
-<p>Мониторинг протяжённой инфраструктуры, охрана периметров и наблюдение за состоянием объектов. Конфигурация системы и условия внедрения определяются для каждого проекта отдельно.</p>
 </div>
+</section>
+
+<section class="section section--tint" aria-labelledby="areas">
+<div class="container">
+""" + section_head("Области применения", "Мониторинг протяжённой инфраструктуры, охрана периметров и наблюдение за состоянием объектов. Конфигурация системы и условия внедрения определяются для каждого проекта отдельно.", "areas") + tiles([
+    ("route", "Протяжённая инфраструктура", "Непрерывное наблюдение за событиями вдоль протяжённых участков."),
+    ("shield", "Охрана периметров", "Мониторинг периметров и выявление воздействий."),
+    ("eye", "Состояние объектов", "Наблюдение за состоянием объектов и регистрация событий."),
+]) + """
 </div>
+</section>
+
+<section class="section" aria-labelledby="project-flow">
+<div class="container">
+""" + section_head("Как строится проект", "Применение системы всегда рассматривается под конкретный объект.", "project-flow") + steps([
+    ("Описание объекта", "Вы рассказываете об объекте и задачах наблюдения."),
+    ("Оценка применимости", "Специалисты рассматривают возможность применения с учётом требований объекта."),
+    ("Согласование конфигурации", "Конфигурация и условия внедрения определяются для проекта отдельно."),
+], light=True) + """
+</div>
+</section>
+
+<section class="section section--tint" aria-labelledby="more">
+<div class="container">
 <div class="spec-row">
-<h2>Дополнительная информация</h2>
+<h2 id="more">Дополнительная информация</h2>
 <div>
 <p>Для обсуждения применения системы «Тетива-М» и получения подробных материалов свяжитесь с представителями ООО «ЛоджикНав».</p>
+<div class="btn-row">
 <a class="btn" href="{cta}">Запросить информацию о «Тетиве-М»</a>
+</div>
 </div>
 </div>
 </div>
 </section>
 </main>
-""".format(cta=contact_link("Запрос информации о «Тетиве-М»"))
+""").format(cta=contact_link("Запрос информации о «Тетиве-М»") + "#request")
 t += footer() + scripts()
 write("/projects/tetiva-m/", t)
 
-# ============================ О компании ============================
+# =========================================================================
+# О компании
+# =========================================================================
 a = head(
     "О компании – ООО «Логическая навигация»",
     "Российская инженерная компания. Разработка электроники, навигационных решений и систем мониторинга.",
     "/about/",
 )
 a += header(("about", True))
-a += """<main id="main">
-<section class="page-hero on-dark">
+a += '<main id="main">\n' + page_hero(
+    [("/", "Главная"), ("/about/", "О компании")],
+    "О компании",
+    "ООО «Логическая навигация» (ООО «ЛоджикНав») – российская инженерная компания, работающая в области разработки электронной аппаратуры, систем управления, навигации и мониторинга.",
+    side='<figure class="plate about-logo"><img src="/assets/img/logo_extended.png" width="1384" height="948" alt="ЛоджикНав — Логическая навигация" loading="lazy"></figure>',
+)
+a += ("""<section class="section" aria-labelledby="activities">
 <div class="container">
-<nav aria-label="Навигационная цепочка"><ol class="breadcrumbs"><li><a href="/">Главная</a></li><li><span aria-current="page">О компании</span></li></ol></nav>
-<div class="hero-split">
-<div>
-<h1>О компании</h1>
-<p class="lead">ООО «Логическая навигация» (ООО «ЛоджикНав») – российская инженерная компания, работающая в области разработки электронной аппаратуры, систем управления, навигации и мониторинга.</p>
-</div>
-<figure class="plate about-logo"><img src="/assets/img/logo_extended.png" width="1384" height="948" alt="ЛоджикНав — Логическая навигация" loading="lazy"></figure>
+""" + section_head("Направления деятельности", "Разрабатываем электронные устройства и системы для специализированных задач.", "activities") + """
+<div class="cards cards--3">
+<article class="card">
+""" + badge("chip") + """
+<h3>Полётные контроллеры</h3>
+<p>Разработка полётных контроллеров и электронных модулей для беспилотных платформ.</p>
+</article>
+<article class="card">
+""" + badge("compass") + """
+<h3>Навигационные решения</h3>
+<p>Создание и развитие навигационных решений и электроники для работы с навигационными данными.</p>
+</article>
+<article class="card">
+""" + badge("activity") + """
+<h3>Системы мониторинга</h3>
+<p>Разработка аппаратно-программных систем мониторинга для распределённых и протяжённых объектов.</p>
+</article>
 </div>
 </div>
 </section>
-<section class="section">
+
+<section class="section section--tint" aria-labelledby="approach">
+<div class="container">
+<div class="split">
+<div>
+<h2 id="approach">Инженерный подход</h2>
+<p>В работе над проектами мы последовательно рассматриваем задачу заказчика, прорабатываем требования к изделию, создаём опытные решения и выполняем их проверку.</p>
+<p>Такой порядок помогает принимать решения по существу задачи: что нужно заказчику, в каких условиях будет работать изделие и как проверить результат.</p>
+""" + check_list(["Рассматриваем задачу заказчика", "Прорабатываем требования к изделию", "Создаём опытные решения", "Выполняем их проверку"]) + """
+</div>
+<figure class="plate about-photo">
+{photo}
+<figcaption>Сборка полётного контроллера LN1YA, вид сбоку</figcaption>
+</figure>
+</div>
+</div>
+</section>
+
+<section class="section" aria-labelledby="principles">
+<div class="container">
+""" + section_head("Принципы работы", None, "principles") + principles() + """
+</div>
+</section>
+
+<section class="section section--tint" aria-labelledby="company">
 <div class="container">
 <div class="spec-row">
-<h2>Направления деятельности</h2>
-<div>
-<ul class="plain-list">
-<li>Разработка полётных контроллеров и электронных модулей</li>
-<li>Создание и развитие навигационных решений</li>
-<li>Разработка аппаратно-программных систем мониторинга</li>
-</ul>
-</div>
-</div>
-<div class="spec-row">
-<h2>Инженерный подход</h2>
-<div>
-<p>В работе над проектами мы последовательно рассматриваем задачу заказчика, прорабатываем требования к изделию, создаём опытные решения и выполняем их проверку.</p>
-</div>
-</div>
-<div class="spec-row">
-<h2>Сведения об организации</h2>
+<h2 id="company">Сведения об организации</h2>
 <div>
 <dl class="company-details">
 <dt>Полное наименование</dt><dd>{full}</dd>
@@ -599,37 +914,41 @@ a += """<main id="main">
 </dl>
 </div>
 </div>
-<div class="spec-row">
-<h2>Сотрудничество</h2>
-<div>
-<p>Открыты к обсуждению технических задач, интеграции электронных модулей и перспективных совместных разработок.</p>
-<a class="btn" href="/contacts/">Связаться с нами</a>
-</div>
-</div>
 </div>
 </section>
 </main>
-""".format(full=FULL_LEGAL_NAME, short=SHORT_NAME, registered=REGISTERED, director=DIRECTOR, okved=OKVED, okved_description=OKVED_DESCRIPTION)
+""").format(
+    photo=picture("side", "(max-width: 900px) 92vw, 520px"),
+    full=FULL_LEGAL_NAME, short=SHORT_NAME, registered=REGISTERED, director=DIRECTOR, okved=OKVED, okved_description=OKVED_DESCRIPTION,
+)
+a += cta_band("Открыты к обсуждению технических задач", "Обсудим интеграцию электронных модулей и перспективные совместные разработки.", label="Связаться с нами")
 a += footer() + scripts()
 write("/about/", a)
 
-# ============================ Контакты ==============================
+# =========================================================================
+# Контакты
+# =========================================================================
 c = head(
     "Контакты – ООО «ЛоджикНав»",
     "Контактная информация и форма обращения по вопросам продукции, разработок и сотрудничества.",
     "/contacts/",
 )
 c += header(("contacts", True))
-c += "<main id=\"main\">\n" + page_hero(
+c += '<main id="main">\n' + page_hero(
     [("/", "Главная"), ("/contacts/", "Контакты")],
     "Контакты",
     "По вопросам продукции, разработок и сотрудничества подготовьте письмо через форму или напишите на нашу электронную почту.",
 )
-c += """<section class="section">
+c += ("""<section class="section">
 <div class="container contact-grid">
 
-<div>
+<div class="contact-side">
 <h2 class="visually-hidden">Реквизиты</h2>
+<div class="mail-card">
+""" + badge("mail") + """
+<p class="mail-card-label">Электронная почта</p>
+<p class="mail-card-value"><a href="mailto:{email}">{email}</a></p>
+</div>
 <dl class="requisites">
 <dt>Полное наименование</dt>
 <dd>{full}</dd>
@@ -645,14 +964,13 @@ c += """<section class="section">
 <dd>{legal_address}</dd>
 <dt>Генеральный директор</dt>
 <dd>{director}</dd>
-<dt>Электронная почта</dt>
-<dd><a href="mailto:{email}">{email}</a></dd>
 </dl>
 </div>
 
-<div class="form-card">
+<div class="form-card" id="request">
 <h2>Направить запрос</h2>
 <p class="form-hint">Заполните поля. После нажатия кнопки откроется почтовое приложение с подготовленным письмом. Письмо отправляется вами самостоятельно.</p>
+<p class="form-hint form-hint--tips">В сообщении полезно указать: что нужно сделать, для какой платформы или объекта, в какие сроки нужен ответ.</p>
 
 <form id="contact-form" action="mailto:{email}" method="post" enctype="text/plain">
 <div class="form-grid">
@@ -721,7 +1039,7 @@ c += """<section class="section">
 </div>
 </section>
 </main>
-""".format(
+""").format(
     email=EMAIL,
     full=FULL_LEGAL_NAME,
     short=SHORT_NAME,
@@ -735,7 +1053,9 @@ c += """<section class="section">
 c += footer() + scripts()
 write("/contacts/", c)
 
-# ============================ 404 ===================================
+# =========================================================================
+# 404
+# =========================================================================
 e = head("Страница не найдена – ООО «ЛоджикНав»", "Запрошенная страница не найдена.", "/404.html", noindex=True)
 e += header(("", False))
 e += """<main id="main" class="error-page">
@@ -750,7 +1070,9 @@ e += """<main id="main" class="error-page">
 e += footer() + scripts()
 write("404", e)
 
-# ============================ sitemap / robots ======================
+# =========================================================================
+# sitemap / robots
+# =========================================================================
 urls = ["/", "/products/", "/products/ln1ya/", "/products/ln14ya/", "/projects/", "/projects/tetiva-m/", "/about/", "/contacts/"]
 sm = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
 for u in urls:
