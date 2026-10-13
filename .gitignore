@@ -1,0 +1,16 @@
+# Собирается автоматически (python3 tools/build.py), в репозиторий не попадает
+/site/*.html
+/site/sitemap.xml
+/site/robots.txt
+/site/.nojekyll
+/site/CNAME
+/site/about/
+/site/contacts/
+/site/products/
+/site/projects/
+
+# Секреты и служебное
+_not_published/
+__pycache__/
+*.pyc
+.DS_Store
