@@ -1,0 +1,55 @@
+name: Публикация сайта на GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Определить адрес сайта
+        run: |
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          REPO="${GITHUB_REPOSITORY#*/}"
+          if [ -s CNAME ]; then
+            URL="https://$(tr -d '[:space:]' < CNAME)"
+          elif [ "${REPO,,}" = "${OWNER}.github.io" ]; then
+            URL="https://${OWNER}.github.io"
+          else
+            URL="https://${OWNER}.github.io/${REPO}"
+          fi
+          echo "SITE_URL=${URL}" >> "$GITHUB_ENV"
+          echo "Адрес сайта: ${URL}"
+
+      - name: Собрать сайт
+        run: |
+          python3 tools/build.py
+          touch site/.nojekyll
+          if [ -s CNAME ]; then cp CNAME site/CNAME; fi
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
